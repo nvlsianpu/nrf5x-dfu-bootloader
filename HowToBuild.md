@@ -19,8 +19,12 @@ You have to clone repositories into your project root (root of this repository):
     HEX_TOOLS_ROOT - it is a path to srecord tools for windows. This can be downloade from https://sourceforge.net/projects/srecord/files/srecord-win32/
     
 # Build bootloader
+
 Run cmake (makes sure that make is on you PATH):
-    mkdir build
-    cd build
-    cmake –G “Unix Makefiles” ..
-    make
+
+```
+mkdir build  
+cd build  
+cmake –G “Unix Makefiles” ..  
+make
+```
