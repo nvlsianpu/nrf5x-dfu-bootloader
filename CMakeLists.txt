@@ -12,6 +12,12 @@ cmake_minimum_required (VERSION 2.8)
 # and to the root binary directory of the project as ${BLE_BOOTLOADER_BINARY_DIR}.
 project (BLE_BOOTLOADER)
 
+
+SET(CMAKE_C_USE_RESPONSE_FILE_FOR_OBJECTS 0)
+SET(CMAKE_CXX_USE_RESPONSE_FILE_FOR_OBJECTS 0)
+SET(CMAKE_C_USE_RESPONSE_FILE_FOR_INCLUDES 0)
+SET(CMAKE_CXX_USE_RESPONSE_FILE_FOR_INCLUDES 0)
+
 # define some more paths to projects we depend on
 set(MBED_SRC_PATH       ${BLE_BOOTLOADER_SOURCE_DIR}/mbed/libraries/mbed/
     CACHE DIRECTORY     "MBED SDK path")
@@ -23,13 +29,16 @@ set(APP_PATH            ${BLE_BOOTLOADER_SOURCE_DIR}/DefaultApp.hex
     CACHE FILE          "Default application to bundle with the bootloader")
 
 set(SOFT_DEVICE         ${MBED_SRC_PATH}/targets/hal/TARGET_NORDIC/TARGET_MCU_NRF51822/Lib/s130_nrf51822_1_0_0/s130_nrf51_1.0.0_softdevice.hex)
-set(PLATFORM            HRM1017
+set(PLATFORM            NRF51822
     CACHE DIRECTORY     "Target platform (NRF51822, ARCH_BLE, HRM1017...)")
 set(BOARD               ${PLATFORM}
     CACHE DIRECTORY     "Target board (NRF51822_MKIT, ARCH_BLE, HRM1017...)")
 
-set(TOOLCHAIN_SYSROOT   /usr/local/
+set(TOOLCHAIN_SYSROOT   C:/Keil_v518/ARM/ARMCC
     CACHE DIRECTORY     "Path to an ARM toolchain") # potential setting for TOOLCHAIN_SYSROOT: ~/ext/arm-toolchains/rvct/ARMCompiler_5.03_117_Linux
+    
+set(HEX_TOOLS_ROOT   C:/Users/anpu.NVLSI/bin/srecord_1_64
+    CACHE DIRECTORY     "Path to an hex tools")
 
 # It's best to hide all the details of setting up the variable SRCS in a CMake
 # macro. The macro can then be called in all the project CMake list files to add
@@ -57,9 +66,9 @@ macro (add_sources)
 endmacro()
 
 # decide about the actual compilers to be used ...
-set(CMAKE_CXX_COMPILER ${TOOLCHAIN_SYSROOT}/bin/armcc)
-set(CMAKE_C_COMPILER   ${TOOLCHAIN_SYSROOT}/bin/armcc)
-set(LINKER             ${TOOLCHAIN_SYSROOT}/bin/armlink)
+set(CMAKE_CXX_COMPILER ${TOOLCHAIN_SYSROOT}/bin/armcc.exe)
+set(CMAKE_C_COMPILER   ${TOOLCHAIN_SYSROOT}/bin/armcc.exe)
+set(LINKER             ${TOOLCHAIN_SYSROOT}/bin/armlink.exe)
 set(SIZE_COMMAND       size)
 set(MAIN_TARGET        ${PROJECT_NAME}.elf)
 set(HEX_TARGET         ${PROJECT_NAME}.hex)
@@ -71,9 +80,9 @@ set(COMBINED_SD_APP    "combined_app.hex"
 set(CMAKE_LINK_FLAGS   "--libpath=${TOOLCHAIN_SYSROOT}/lib --info=totals --list=.link_totals.txt --scatter ${BLE_BOOTLOADER_SOURCE_DIR}/bootloader.sct")
 
 set(CMAKE_CXX_LINK_EXECUTABLE
-    "${LINKER} ${CMAKE_LINK_FLAGS} <OBJECTS> -o <TARGET> --map --feedback=.feedback --feedback_type=unused,iw")
+    "${LINKER} ${CMAKE_LINK_FLAGS} <OBJECTS> -o <TARGET> --map")
 set(CMAKE_C_LINK_EXECUTABLE
-    "${LINKER} ${CMAKE_LINK_FLAGS} <OBJECTS> -o <TARGET> --map --feedback=.feedback --feedback_type=unused,iw")
+    "${LINKER} ${CMAKE_LINK_FLAGS} <OBJECTS> -o <TARGET> --map")
 enable_language(ASM)
 
 message(STATUS "C compiler  : ${CMAKE_C_COMPILER}")
@@ -114,8 +123,6 @@ include_directories(
     ${MBED_SRC_PATH}/targets/hal/TARGET_NORDIC/TARGET_MCU_NRF51822/TARGET_${BOARD}
 
     ${BLE_API_SRC_PATH}
-    ${BLE_API_SRC_PATH}/ble
-    ${BLE_API_SRC_PATH}/ble/services
 
     ${NRF51822_SRC_PATH}/source
     ${NRF51822_SRC_PATH}/source/btle
@@ -175,7 +182,6 @@ add_definitions(
     -D__MBED__=1
     -DNEED_PSTORAGE
     -DNEED_APP_GPIOTE
-    --feedback=.feedback
 )
 
 # Language specifc compiler flags.
@@ -233,13 +239,13 @@ add_executable(${MAIN_TARGET} ${SRCS})
 add_custom_command(
     # Show ELF size
     TARGET ${MAIN_TARGET}
-    COMMAND ${SIZE_COMMAND} ${MAIN_TARGET}
+    COMMAND ${SIZE_COMMAND} ${MAIN_TARGET}.exe
 )
 
 add_custom_target(${HEX_TARGET} ALL
     DEPENDS ${MAIN_TARGET}
-    COMMAND ${TOOLCHAIN_SYSROOT}/bin/fromelf --i32combined -o ${PROJECT_NAME}.hex ${MAIN_TARGET}
-    COMMAND srec_cat ${PROJECT_NAME}.hex -intel
+    COMMAND ${TOOLCHAIN_SYSROOT}/bin/fromelf --i32combined -o ${PROJECT_NAME}.hex ${MAIN_TARGET}.exe
+    COMMAND ${HEX_TOOLS_ROOT}/srec_cat ${PROJECT_NAME}.hex -intel
         # Change bootloader settings: BANK0 now contains a valid application
         -exclude 0x3FC00 0x3FC20
         -generate 0x3FC00 0x3FC04 -l-e-constant 0x01 4
@@ -252,10 +258,10 @@ add_custom_target(${HEX_TARGET} ALL
 add_custom_target(${COMBINED_SD} ALL
     COMMENT "Add a SoftDevice to the HEX package"
     DEPENDS ${HEX_TARGET}
-    COMMAND srec_cat ${SOFT_DEVICE} -intel
+    COMMAND ${HEX_TOOLS_ROOT}/srec_cat ${SOFT_DEVICE} -intel
         ${HEX_TARGET} -intel
         -o ${COMBINED_SD} -intel -obs=16
-    COMMAND srec_info ${COMBINED_SD} -intel
+    COMMAND ${HEX_TOOLS_ROOT}/srec_info ${COMBINED_SD} -intel
 )
 
 # The following is optional. Enable it if you wish to combine with a default app.
